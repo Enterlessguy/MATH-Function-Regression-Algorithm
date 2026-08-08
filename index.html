@@ -1,0 +1,23 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Topographic Core | Sketch Regression Engine</title>
+    <meta name="description" content="Draw a function by hand; get polynomial, exponential, logarithmic, Fourier and measure-theoretic analyses back: areas, LaTeX and Desmos-ready curves.">
+
+    <!-- Tailwind CSS (utility styling, CDN for zero-build setup) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- KaTeX for LaTeX rendering -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.js" defer></script>
+
+    <link rel="stylesheet" href="./styles.css">
+</head>
+<body class="bg-slate-950">
+    <div id="root"></div>
+    <div id="toasts" class="fixed bottom-4 right-4 z-50 flex flex-col gap-2 items-end pointer-events-none"></div>
+    <script type="module" src="./src/main.js"></script>
+</body>
+</html>

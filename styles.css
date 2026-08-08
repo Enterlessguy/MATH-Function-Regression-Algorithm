@@ -1,0 +1,16 @@
+﻿/* Small CSS additions on top of Tailwind utilities. */
+
+/* Hide horizontal scrollbars on latex rows while keeping scrollability */
+.scrollbar-hide::-webkit-scrollbar { display: none; }
+.scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+
+/* Custom scrollbar for the cyber aesthetic */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: #020617; }
+::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #334155; }
+
+body { margin: 0; padding: 0; background-color: #020617; }
+
+/* Toast entrance */
+#toasts > div { opacity: 0; }

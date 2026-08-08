@@ -1,0 +1,23 @@
+{
+  "name": "math-function-regression-algorithm",
+  "version": "2.0.0",
+  "description": "Hand-drawn sketch regression engine: polynomial / exponential / logarithmic / Fourier fits, Lebesgue & Riemann integration, Green's-theorem areas, and Desmos-ready parametric output. Zero build step.",
+  "type": "module",
+  "license": "MIT",
+  "scripts": {
+    "start": "node scripts/serve.mjs",
+    "build": "node scripts/build.mjs",
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "keywords": [
+    "regression",
+    "fourier",
+    "lebesgue-integration",
+    "canvas",
+    "math",
+    "visualization"
+  ]
+}
