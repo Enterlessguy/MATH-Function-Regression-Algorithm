@@ -141,15 +141,31 @@ function runCompute() {
 
 function wireCanvas(canvasEl, containerEl) {
   const rect = () => canvasEl.getBoundingClientRect();
-  const toMath = (clientX, clientY) => {
+
+  // Pointer coordinates arrive in viewport pixels, which grow with page
+  // zoom (Ctrl+scroll / pinch / display scaling). getBoundingClientRect()
+  // reports that scaled size, but s.dimensions stays in layout pixels, so
+  // raw client deltas would place strokes zoom-times away from the cursor.
+  // Scale the deltas back into the canvas' layout space first.
+  const toLocal = (clientX, clientY) => {
     const s = store.getState();
     const r = rect();
     const { w, h } = s.dimensions;
-    const px = clientX - r.left;
-    const py = clientY - r.top;
+    const sx = r.width > 0 ? w / r.width : 1;
+    const sy = r.height > 0 ? h / r.height : 1;
     return {
-      x: (px - w / 2 - s.pan.x) / s.zoom,
-      y: -(py - h / 2 - s.pan.y) / s.zoom,
+      x: (clientX - r.left) * sx,
+      y: (clientY - r.top) * sy,
+    };
+  };
+
+  const toMath = (clientX, clientY) => {
+    const s = store.getState();
+    const p = toLocal(clientX, clientY);
+    const { w, h } = s.dimensions;
+    return {
+      x: (p.x - w / 2 - s.pan.x) / s.zoom,
+      y: -(p.y - h / 2 - s.pan.y) / s.zoom,
     };
   };
 
@@ -169,7 +185,11 @@ function wireCanvas(canvasEl, containerEl) {
   canvasEl.addEventListener('pointermove', (e) => {
     const s = store.getState();
     if (s.isPanning) {
-      store.setState((st) => ({ pan: { x: st.pan.x + e.movementX, y: st.pan.y + e.movementY } }));
+      const r = rect();
+      const { w, h } = s.dimensions;
+      const sx = r.width > 0 ? w / r.width : 1;
+      const sy = r.height > 0 ? h / r.height : 1;
+      store.setState((st) => ({ pan: { x: st.pan.x + e.movementX * sx, y: st.pan.y + e.movementY * sy } }));
       return;
     }
     if (!s.isDrawing) return;
@@ -199,19 +219,17 @@ function wireCanvas(canvasEl, containerEl) {
   // Zoom toward the cursor, keeping the math point under it fixed.
   canvasEl.addEventListener('wheel', (e) => {
     e.preventDefault();
-    const r = rect();
-    const mx = e.clientX - r.left;
-    const my = e.clientY - r.top;
+    const p = toLocal(e.clientX, e.clientY);
     store.setState((s) => {
       const factor = e.deltaY < 0 ? 1.1 : 1 / 1.1;
       const zoom = Math.min(1000, Math.max(5, s.zoom * factor));
-      const mathX = (mx - s.dimensions.w / 2 - s.pan.x) / s.zoom;
-      const mathY = -(my - s.dimensions.h / 2 - s.pan.y) / s.zoom;
+      const mathX = (p.x - s.dimensions.w / 2 - s.pan.x) / s.zoom;
+      const mathY = -(p.y - s.dimensions.h / 2 - s.pan.y) / s.zoom;
       return {
         zoom,
         pan: {
-          x: mx - s.dimensions.w / 2 - mathX * zoom,
-          y: my - s.dimensions.h / 2 + mathY * zoom,
+          x: p.x - s.dimensions.w / 2 - mathX * zoom,
+          y: p.y - s.dimensions.h / 2 + mathY * zoom,
         },
       };
     });
