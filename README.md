@@ -236,3 +236,7 @@ The 31 tests cover the matrix solvers, every regression model, DFT reconstructio
 ## License
 
 [MIT](./LICENSE)
+
+## Disclaimer
+
+This project has no affiliation with Intel Corporation.
