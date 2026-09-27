@@ -1,5 +1,7 @@
 # Topographic Core
 
+**Try it live: [enterlessguy.github.io/MATH-Function-Regression-Algorithm](https://enterlessguy.github.io/MATH-Function-Regression-Algorithm/)**
+
 **Turn a freehand sketch into fitted math.** Draw a function or a closed loop with your mouse or finger, and Topographic Core fits a model, integrates it, measures the enclosed area, and hands you KaTeX-rendered LaTeX plus a Desmos-ready parametric curve.
 
 This repository is a ground-up rewrite of a single ~70 KB HTML file that ran React and in-browser Babel. The rewrite is plain ES modules with a zero build step, a pure math core with unit tests, and a Web Worker for the heavy Fourier math.
