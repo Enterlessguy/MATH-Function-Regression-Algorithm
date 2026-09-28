@@ -1,23 +1,161 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Topographic Core | Sketch Regression Engine</title>
-    <meta name="description" content="Draw a function by hand; get polynomial, exponential, logarithmic, Fourier and measure-theoretic analyses back: areas, LaTeX and Desmos-ready curves.">
-
-    <!-- Tailwind CSS (utility styling, CDN for zero-build setup) -->
-    <script src="https://cdn.tailwindcss.com"></script>
-
-    <!-- KaTeX for LaTeX rendering -->
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
-    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.js" defer></script>
-
-    <link rel="stylesheet" href="./styles.css">
+    <meta http-equiv="Content-Security-Policy"
+        content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' blob: data:; font-src 'self'; connect-src 'none'; base-uri 'none'; form-action 'none'">
+    <meta name="referrer" content="no-referrer">
+    <title>Function Regression · Intelligence Database</title>
+    <link rel="icon" href="assets/cube.png">
+    <link rel="stylesheet" href="src/styles.css">
 </head>
-<body class="bg-slate-950">
-    <div id="root"></div>
-    <div id="toasts" class="fixed bottom-4 right-4 z-50 flex flex-col gap-2 items-end pointer-events-none"></div>
-    <script type="module" src="./src/main.js"></script>
+
+<body class="booting">
+    <div class="app" id="app">
+        <!-- ============================================================ Sidebar -->
+        <aside class="sidebar" aria-label="Engine settings">
+            <div class="brand">
+                <img src="assets/cube.png" alt="" width="38" height="38">
+                <div>
+                    <div class="brand-title">Function Regression</div>
+                    <div class="brand-sub">Intelligence Database</div>
+                </div>
+            </div>
+
+            <div class="scroll">
+                <section class="group">
+                    <h2 class="section">Drawing</h2>
+                    <label class="field-label">Stroke behaviour</label>
+                    <div class="segmented" data-setting="drawingMode">
+                        <button type="button" data-value="single">Continuous</button>
+                        <button type="button" data-value="piecewise">Piecewise</button>
+                    </div>
+                    <div class="row-when" data-show="single">
+                        <label class="field-label">Topology</label>
+                        <div class="segmented" data-setting="topology">
+                            <button type="button" data-value="auto">Auto</button>
+                            <button type="button" data-value="open">Function</button>
+                            <button type="button" data-value="closed">Closed</button>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="group" id="model-group">
+                    <h2 class="section">Model</h2>
+                    <label class="field-label" for="model">Regression target</label>
+                    <select id="model" data-setting="model">
+                        <option value="polynomial">Polynomial</option>
+                        <option value="fourier">Fourier series</option>
+                        <option value="exponential">Exponential</option>
+                        <option value="logarithmic">Logarithmic</option>
+                        <option value="constant">Constant</option>
+                    </select>
+                    <div class="slider" data-show="polynomial">
+                        <div class="slider-head"><label for="degree">Degree</label><output data-for="degree"></output></div>
+                        <input type="range" id="degree" data-setting="degree" min="1" max="30" step="1">
+                    </div>
+                    <div class="slider" data-show="harmonics">
+                        <div class="slider-head"><label for="harmonics">Harmonics</label><output data-for="harmonics"></output></div>
+                        <input type="range" id="harmonics" data-setting="harmonics" min="1" max="500" step="1">
+                        <label class="toggle" title="Damps high harmonics. Rarely needed: the series here are already continuous, so there is no Gibbs overshoot to suppress. Slightly shrinks shapes."><input type="checkbox" data-setting="sigma"><span></span>Lanczos σ smoothing</label>
+                    </div>
+                </section>
+
+                <section class="group" id="integration-group">
+                    <h2 class="section">Integration</h2>
+                    <div class="segmented grid-3" data-setting="intMethod">
+                        <button type="button" data-value="simpson">Simpson</button>
+                        <button type="button" data-value="trapezoid">Trapezoid</button>
+                        <button type="button" data-value="mid">Midpoint</button>
+                        <button type="button" data-value="left">Left</button>
+                        <button type="button" data-value="right">Right</button>
+                        <button type="button" data-value="lebesgue">Lebesgue</button>
+                    </div>
+                    <div class="slider">
+                        <div class="slider-head"><label for="intN">Subdivisions (N)</label><output data-for="intN"></output></div>
+                        <input type="range" id="intN" data-setting="intN" min="2" max="1000" step="2">
+                    </div>
+                    <label class="toggle"><input type="checkbox" data-setting="showArea"><span></span>Shade the area</label>
+                </section>
+
+                <section class="group">
+                    <h2 class="section">App</h2>
+                    <label class="toggle"><input type="checkbox" data-setting="showRaw"><span></span>Show raw strokes</label>
+                    <label class="toggle"><input type="checkbox" data-setting="intro"><span></span>Play startup animation</label>
+                    <label class="field-label" for="userName">Name for the greeting</label>
+                    <input type="text" id="userName" data-setting="userName" maxlength="40" autocomplete="off"
+                        spellcheck="false" placeholder="Optional">
+                </section>
+            </div>
+
+            <div class="shortcuts">
+                <div><kbd>Ctrl</kbd><kbd>Z</kbd> Undo</div>
+                <div><kbd>Del</kbd> Clear</div>
+                <div><kbd>F</kbd> Fit view</div>
+                <div><kbd>Right-drag</kbd> Pan</div>
+                <div><kbd>Wheel</kbd> Zoom</div>
+            </div>
+        </aside>
+
+        <!-- ============================================================ Canvas -->
+        <main class="stage" id="stage">
+            <canvas id="plot" aria-label="Drawing surface: draw a function or closed shape"></canvas>
+
+            <div class="toolbar card-float">
+                <button type="button" class="ghost" id="undo" title="Undo (Ctrl+Z)">
+                    <svg viewBox="0 0 24 24"><polyline points="1 4 1 10 7 10" /><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" /></svg>Undo
+                </button>
+                <button type="button" class="ghost" id="fit" title="Fit view to strokes (F)">
+                    <svg viewBox="0 0 24 24"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3" /></svg>Fit
+                </button>
+                <button type="button" class="ghost" id="export" title="Save the canvas as PNG">
+                    <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" /></svg>PNG
+                </button>
+                <span class="divider"></span>
+                <button type="button" class="danger" id="clear" title="Clear all strokes (Delete)">
+                    <svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6" /><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6m5 0V4a2 2 0 0 1 2-2h0a2 2 0 0 1 2 2v2" /></svg>Clear
+                </button>
+            </div>
+
+            <div class="zoom card-float">
+                <button type="button" class="ghost icon" id="zoom-out" title="Zoom out" aria-label="Zoom out">
+                    <svg viewBox="0 0 24 24"><line x1="5" y1="12" x2="19" y2="12" /></svg>
+                </button>
+                <button type="button" class="ghost mono" id="zoom-reset" title="Reset view"></button>
+                <button type="button" class="ghost icon" id="zoom-in" title="Zoom in" aria-label="Zoom in">
+                    <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
+                </button>
+            </div>
+
+            <div class="empty" id="empty">
+                <svg viewBox="0 0 24 24"><path d="M12 19l7-7 3 3-7 7-3-3z" /><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z" /><path d="M2 2l7.586 7.586" /><circle cx="11" cy="11" r="2" /></svg>
+                <div class="empty-title">Draw a function to begin</div>
+                <div class="empty-sub">Draw left to right for y = f(x), or loop back to your start point for a closed shape.</div>
+            </div>
+
+            <div class="hud mono" id="hud"></div>
+        </main>
+
+        <!-- ============================================================ Results -->
+        <aside class="results" aria-label="Results" aria-live="polite">
+            <div class="results-head">
+                <div>
+                    <h1 class="title">Results</h1>
+                    <div class="subtitle" id="results-sub">Waiting for a stroke</div>
+                </div>
+                <span class="badge" id="status-badge">Idle</span>
+            </div>
+            <div class="scroll" id="results"></div>
+        </aside>
+    </div>
+
+    <div class="toast" id="toast" role="status"></div>
+
+    <script src="src/math.js"></script>
+    <script src="src/splash.js"></script>
+    <script src="src/app.js"></script>
 </body>
+
 </html>

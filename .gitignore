@@ -1,7 +1,24 @@
-﻿node_modules/
-dist/
-*.log
+# Node (no dependencies today, but keep installs out if any appear)
+node_modules/
+npm-debug.log*
+
+# Test and screenshot output
+test-results/
+playwright-report/
+*.local.png
+
+# Editors and OS
+.vscode/
+.idea/
+*.swp
 .DS_Store
 Thumbs.db
-.idea/
-.vscode/
+desktop.ini
+
+# Secrets must never be committed
+.env
+.env.*
+*.pem
+*.key
+*.log
+dist/
