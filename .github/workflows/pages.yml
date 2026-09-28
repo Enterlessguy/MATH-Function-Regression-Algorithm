@@ -15,7 +15,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  build-and-deploy:
+  deploy:
     runs-on: ubuntu-latest
     environment:
       name: github-pages
@@ -23,14 +23,23 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
 
-      - name: Build single-file bundle
-        run: node scripts/build.mjs
+      - name: Test
+        run: node --test
+
+      # No build step: publish only the files the page needs.
+      - name: Assemble site
+        run: |
+          mkdir _site
+          cp -r index.html src assets .nojekyll _site/
+          rm -f _site/src/*.map
 
       - name: Configure Pages
         uses: actions/configure-pages@v5
@@ -38,7 +47,7 @@ jobs:
       - name: Upload site artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: .
+          path: _site
 
       - name: Deploy
         id: deployment

@@ -1,243 +1,189 @@
-# Topographic Core
+# Function Regression Algorithm
 
-**Try it live: [enterlessguy.github.io/MATH-Function-Regression-Algorithm](https://enterlessguy.github.io/MATH-Function-Regression-Algorithm/)**
+**Live version: [enterlessguy.github.io/MATH-Function-Regression-Algorithm](https://enterlessguy.github.io/MATH-Function-Regression-Algorithm/)**
 
-**Turn a freehand sketch into fitted math.** Draw a function or a closed loop with your mouse or finger, and Topographic Core fits a model, integrates it, measures the enclosed area, and hands you KaTeX-rendered LaTeX plus a Desmos-ready parametric curve.
+Draw a curve with the mouse and get a formula for it. The program fits the
+drawing with a polynomial, Fourier series, exponential, logarithm or constant.
+It fits closed shapes with a parametric Fourier series, and it computes the
+area under the fitted function with six integration methods. Every formula
+can be copied as LaTeX and pasted into Desmos.
 
-This repository is a ground-up rewrite of a single ~70 KB HTML file that ran React and in-browser Babel. The rewrite is plain ES modules with a zero build step, a pure math core with unit tests, and a Web Worker for the heavy Fourier math.
+It uses the same look and startup animation as
+[I-DB Macro](https://github.com/Enterlessguy/IDB-Macro) and the Schedule I
+Control Center.
 
-## Release notes
+![Fourier series fitted to a hand-drawn curve](docs/screenshot.png)
 
-**v2.0.0** is the first public release. It is a re-architecture rather than a facelift:
+## Running it
 
-- **Zero build step.** The app is static HTML, CSS, and ES modules. There is no bundler, no transpiler, no framework, and no `npm install`.
-- **A testable math core.** Every fit and every integration method lives in a pure, dependency-free module covered by 31 unit tests in `test/math.test.js`.
-- **One shared pipeline.** The Web Worker and the UI run the same analysis code, so the two threads cannot disagree about a result.
-- **Correct integration.** The Lebesgue-style integrator used to return 0 for `f(x) = 5` and under-counted any function sitting above zero. Both defects are fixed and regression-tested. Simpson's rule and exact antiderivative integration are new.
-- **Stable high-degree fits.** Polynomials up to degree 30 use scaled QR least squares instead of normal equations.
-- **The top harmonic survives.** The Lanczos sigma window no longer zeroes the highest Fourier coefficient.
-- **Faster resampling.** Fourier paths resample with a binary search (O(log n) per sample) instead of a linear scan (O(n)).
-- **No dead ends.** A crashed worker falls back to the main thread, toasts replace `alert()`, and clipboard operations degrade gracefully under `file://`.
-- **Sharper drawing.** The canvas is device-pixel-ratio aware, and zoom targets the cursor instead of the viewport centre.
+- Online: open the link above.
+- Offline: download the repository and open `index.html` in Chrome, Edge or
+  Firefox. There is nothing to install or build.
 
-## Capabilities
+## Controls
 
-- **Input.** Freehand drawing, wheel zoom, right-drag pan, and multi-stroke piecewise mode for modelling different regions with different functions.
-- **Models.** Polynomial (degree 0..30), exponential `a e^{bx}`, logarithmic `a + b ln x`, constant, and one-dimensional Fourier series.
-- **Closed curves.** Arc-length resampling plus a discrete Fourier transform rebuilds any closed stroke as a sum of rotating circles (epicycles), with an optional Lanczos anti-Gibbs window.
-- **Integration.** Riemann sums (left, midpoint, right, trapezoid), Simpson's rule, a Lebesgue-style level-set integrator, and exact integrals from antiderivatives for every model.
-- **Area.** Closed shapes report the signed area via Green's theorem (shoelace form).
-- **Fit quality.** Every piece reports R² and RMSE, so you can judge the fit before trusting its integral.
-- **Output.** KaTeX-rendered LaTeX per piece, copy buttons, and a Desmos-pasteable parametric `(X(t), Y(t))` for closed curves.
-## Getting started
+- **Left mouse:** draw. In *Continuous* mode each new stroke replaces the old
+  one. In *Piecewise* mode every stroke is fitted as a separate segment.
+- **Shape:** *Auto* treats a stroke as a closed curve when it ends near its
+  start point. *Function* and *Closed* set it by hand.
+- **Right or middle drag:** pan. **Mouse wheel:** zoom around the cursor.
+- **Keys:** <kbd>Ctrl</kbd>+<kbd>Z</kbd> undo, <kbd>Del</kbd> clear,
+  <kbd>F</kbd> fit the view to the drawing, <kbd>+</kbd>/<kbd>-</kbd> zoom,
+  <kbd>0</kbd> reset the view.
+- **Copy LaTeX:** copies `y=… \left\{a\le x\le b\right\}`, which Desmos
+  accepts as-is. Closed curves copy as `(X(t), Y(t))` with `t` from 0 to 1.
 
-Three ways to run it. None of them compiles anything.
+## How the math works
 
-### 1. Live on GitHub Pages
+### Least squares
 
-Push the repository and the included workflow builds and publishes the site automatically. No local host, no scripts, no dependencies. See [Deploy to GitHub Pages](#deploy-to-github-pages).
+Each model is fitted by minimising the weighted squared error
 
-### 2. Pre-packaged single file
+$$\sum_i w_i \big(f(x_i) - y_i\big)^2 .$$
 
-Open `dist/topographic-core.html` and double-click. The app, the math engine, and the web worker are all inside that one file, and it runs from `file://` with no server and no Node.js. Only the Tailwind and KaTeX CDNs need an internet connection.
+The linear systems are solved with a Householder QR decomposition. The
+normal equations $A^\mathsf{T}A\,c = A^\mathsf{T}y$ are not used, because
+forming $A^\mathsf{T}A$ squares the condition number.
 
-### 3. Local dev server
+### Weights
 
-Requires Node.js 18 or newer:
+A stroke has more points where the mouse moved slowly. With equal weights,
+those parts of the curve would count for more in the fit. So each point is
+weighted by the width of the x-interval around it:
 
-```bash
-npm start        # serve at http://localhost:4173
-npm test         # run the unit tests (node --test, zero deps)
-npm run build    # regenerate dist/topographic-core.html
-```
+$$w_i = \tfrac{1}{2}(x_{i+1} - x_{i-1}).$$
 
-There is no `npm install` step; `npm start` is just `node scripts/serve.mjs`.
+The sum above is then a Riemann sum for $\int (f - y)^2\,dx$. The fit
+minimises the error over the whole interval, not over the sampled points.
 
-Why does development need a server? Browsers block ES modules over `file://`. Production avoids that problem entirely: the hosted site (option 1) and the bundled file (option 2) both run without one.
+### Polynomial
 
-## Deploy to GitHub Pages
+$x$ is mapped to $u = (x - c)/h \in [-1, 1]$, and the polynomial is written
+in Chebyshev polynomials:
 
-1. Push this repository to GitHub on the `main` branch.
-2. In the repo settings, open Pages and set Source to **GitHub Actions**.
-3. The workflow at `.github/workflows/pages.yml` builds `dist/` and publishes the site at `https://<user>.github.io/<repo>/` on every push (or via manual `workflow_dispatch`).
+$$p(x) = \sum_{k=0}^{n} a_k T_k(u), \qquad T_{k+1}(u) = 2u\,T_k(u) - T_{k-1}(u).$$
 
-That workflow is the whole "auto compile and run" story: push once, and every later push republishes.
+On $[-1, 1]$ the Chebyshev polynomials are much closer to orthogonal than the
+plain powers $1, x, x^2, \dots$, whose columns become nearly parallel as the
+degree grows. The Chebyshev system stays well conditioned up to degree 30. The polynomial
+is evaluated with Clenshaw's recurrence. It is shown in powers of $x$ up to
+degree 10, and in powers of $u$ above that. The degree is limited to one less
+than the number of distinct x values.
 
-## The math, in detail
+### Exponential
 
-### 1. From strokes to pieces
+$y = A e^{bx}$ is not linear in $b$. Taking logarithms gives the line
+$\ln y = \ln A + bx$, which provides a starting guess. That line fit on its
+own is biased: it minimises the error in $\ln y$, not in $y$. The starting
+guess is therefore refined with Levenberg–Marquardt on the actual residuals
+$A e^{bx_i} - y_i$. Negative $A$ is supported: when the $y$ values sum to a negative
+number, the starting guess is made from $-y$.
 
-A stroke is a list of points in math coordinates. The viewport maps pixels to math coordinates, so zoom and pan change what you are fitting without changing the stored geometry. Strokes with fewer than six points are ignored as noise.
+### Logarithmic
 
-Each stroke becomes its own piece unless the end of one stroke lands close to its start. In auto mode, the engine treats the drawing as a closed curve when the endpoints sit within 40 screen pixels of each other. Open pieces go to the regression path; closed pieces go to the DFT path.
+$y = a + b\ln x$ is linear in $a$ and $b$, so it is an ordinary least-squares
+fit against $\ln x$. Points with $x \le 0$ are left out, and the number left
+out is shown.
 
-### 2. Polynomial regression
+### Fourier series of a function
 
-The polynomial model is
+On $[x_0, x_1]$, with $t = (x - x_0)/(x_1 - x_0)$:
 
-$$P(x) = \sum_{i=0}^{n} c_i x^i$$
+$$f(x) = L(t) + \frac{a_0}{2} + \sum_{k=1}^{H}\big(a_k \cos 2\pi k t + b_k \sin 2\pi k t\big),$$
 
-and the fit solves the least-squares problem `min ||A c - y||` for the Vandermonde matrix `A_{ji} = x_j^i`. The classic route, the normal equations `A^T A c = A^T y`, squares the condition number and becomes unstable past degree 10 or so. This engine scales each column of the Vandermonde matrix to unit norm and solves the least-squares problem with a modified Gram-Schmidt QR decomposition, which stays stable up to degree 30. Linearly dependent columns get zero rows in R and are skipped, so the solver returns a sensible answer instead of NaN.
-### 3. Exponential and logarithmic fits
+where $L$ is the straight line through the two end points of the stroke. A
+Fourier series is periodic. If the stroke ends at a different height than it
+starts, the periodic copy has a jump, and a jump causes Gibbs overshoot and
+coefficients that decay only like $1/k$. Subtracting $L$ first makes both
+ends zero, so the periodic copy is continuous and the coefficients decay like
+$1/k^2$. The coefficients come from an FFT of the stroke resampled at
+uniform $x$. $H$ is limited to half the number of points (the Nyquist limit).
 
-Both models are linearised before fitting:
+### Closed curves
 
-- Exponential: `y = a e^{bx}` becomes `ln y = ln a + b x`, a line fit in (x, ln y) over the points with y > 0.
-- Logarithmic: `y = a + b ln x` becomes a line fit in (ln x, y) over the points with x > 0.
+The stroke is treated as a complex function $z = x + iy$, resampled at
+equal arc-length steps, and transformed with an FFT:
 
-The intercept of the linear fit is exponentiated to recover `a`. Linearisation is cheap and stable, at the cost of assuming multiplicative noise on y.
+$$z(t) = \sum_{k=-H}^{H} c_k\, e^{2\pi i k t}, \qquad t \in [0, 1].$$
 
-### 4. Constant fit
+The enclosed area follows from Green's theorem, $A = \tfrac12\oint(x\,dy - y\,dx)$.
+Substituting the series gives
 
-The constant model returns the mean of the y values, which is the least-squares optimum for degree 0.
+$$A = \pi \sum_{k} k\,|c_k|^2 .$$
 
-### 5. One-dimensional Fourier series
+This is compared with the shoelace formula on the raw points. The sign of
+$A$ gives the direction: positive means counter-clockwise.
 
-For an open piece on [a, b], the stroke is resampled to uniformly spaced x values and the engine estimates coefficients of
+### Lanczos σ
 
-$$f(x) = \frac{a_0}{2} + \sum_{k=1}^{H} \left( a_k \cos\frac{2\pi k x}{T} + b_k \sin\frac{2\pi k x}{T} \right), \quad T = b - a$$
+Optional. It multiplies harmonic $k$ by $\sigma_k = \operatorname{sinc}\!\big(k/(H+1)\big)$,
+which damps high harmonics. With $H$ instead of $H+1$ in the denominator, the
+last harmonic would be multiplied by zero. It is off by default: both series
+above are already continuous, and σ also scales the first harmonic
+slightly, which shrinks the curve (about 2% of the area at 12 harmonics).
 
-The coefficients are numeric quadratures of the standard Fourier integrals over the resampled stroke. Resampling evaluates the stroke at each of the 16,000 uniform samples; a binary search over the sorted points makes every lookup O(log n) instead of O(n), which matters for long strokes.
+### Integration
 
-### 6. Closed curves: arc length and DFT
+The integral of the fitted function over $[a, b]$ is computed with $N$
+subintervals:
 
-A closed stroke is treated as a complex signal `z(t) = x(t) + i y(t)` on the unit circle. First the stroke is resampled uniformly by cumulative arc length, so slow, dense handwriting does not dominate the spectrum. A discrete Fourier transform then produces coefficients `c_k` for k in [-H, H], and the reconstruction is
+| Method | Formula | Error |
+| --- | --- | --- |
+| Left / right | $h\sum f(x_i)$ at left or right ends | $O(h)$ |
+| Midpoint | $h\sum f\big(\tfrac{x_i + x_{i+1}}{2}\big)$ | $O(h^2)$ |
+| Trapezoid | $h\sum \tfrac12\big(f(x_i) + f(x_{i+1})\big)$ | $O(h^2)$ |
+| Simpson | $\tfrac{h}{3}\big(f_0 + 4f_1 + 2f_2 + \dots + 4f_{N-1} + f_N\big)$ | $O(h^4)$ |
+| Lebesgue | see below | |
 
-$$z(t) = \sum_{k=-H}^{H} c_k e^{i 2\pi k t}$$
+The Lebesgue sum cuts the area into horizontal strips instead of vertical ones:
 
-Every term is one rotating circle: `|c_k|` sets the radius, `arg(c_k)` the phase, and k the rotation speed. H trades detail against smoothness. The optional Lanczos window scales each coefficient by `sinc(k pi / (H+1))`. The naive `sinc(k pi / H)` zeroes the last harmonic, so the engine uses H+1 in the denominator.
-### 7. Integration
+$$\int f^+\,dx = \int_0^{\max f} \mu\{x : f(x) > t\}\,dt,$$
 
-Integration runs on the fitted model rather than the raw sketch, so the result reflects the model you picked. Change the model and watch the area change with it.
+where $\mu$ is the total length of the set of $x$ where $f$ is above the
+level $t$. $\mu$ is measured from 20,000 sorted samples of $f$, and the
+integral over $t$ uses the midpoint rule with $N$ levels. The negative part
+is done the same way.
 
-**Riemann sums.** Left, midpoint, right, and trapezoid estimates of `int_a^b f(x) dx` on a uniform grid. The trapezoid rule converges like O(1/n²) for smooth functions.
+Each result is compared with a reference value from 5-point Gauss–Legendre
+quadrature on 2,048 panels, split at segment ends. The error is shown
+relative to $\int |f|\,dx$, because the signed area can be close to zero.
 
-**Simpson's rule.** The composite rule fits a parabola through every triple of adjacent samples:
+### Fit quality
 
-$$S = \frac{\Delta x}{3} \left( f(x_0) + 4 \sum_{\text{odd}} f(x_i) + 2 \sum_{\text{even}} f(x_i) + f(x_n) \right)$$
+Each segment shows $R^2 = 1 - SS_\text{res}/SS_\text{tot}$ and the RMSE.
 
-It converges like O(1/n²) for smooth functions and is exact for polynomials up to degree 3.
-
-**Lebesgue-style integration.** Instead of slicing vertically, the integrator slices horizontally and measures the level sets:
-
-$$\int_0^\infty \mu\{x : f(x) \ge t\}\,dt - \int_{-\infty}^0 \mu\{x : f(x) \le t\}\,dt$$
-
-At each level t it counts the samples above (or below) t, multiplies by the sample spacing, and accumulates over the level range. For continuous functions this matches the Riemann integral; it stays exact for step functions and shrugs off vertical jumps. Two historical bugs lived here: a constant function like `f(x) = 5` returned 0, and any function sitting above zero under-counted the box below its minimum. The integrator now uses the true zero baseline, and both cases are regression-tested.
-
-**Exact integration.** Every model has a closed-form antiderivative, so the engine can also report the exact value:
-
-- Polynomial: term-by-term power rule, `c_i x^{i+1}/(i+1)`.
-- Exponential: `(a/b) e^{bx}`, with the b = 0 case reduced to a constant.
-- Logarithmic: `b (x ln x - x) + a x`.
-- Constant: `c x`.
-- Fourier: term-by-term sine and cosine integrals.
-
-The sidebar shows the numeric result and the exact result side by side, with the absolute error between them. If a piece cannot be integrated in closed form, the engine reports `exact: false` and shows the numeric value alone. With the current models that case never occurs.
-### 8. Area of closed shapes
-
-The signed area comes from Green's theorem in shoelace form:
-
-$$A = \frac{1}{2} \oint (x\,dy - y\,dx)$$
-
-evaluated over the resampled polygon. A circle of radius r yields `pi r^2` in the tests. The sign carries the winding direction; the UI shows the absolute area.
-
-### 9. Fit quality
-
-For each piece, the metrics are computed at the original stroke points:
-
-$$R^2 = 1 - \frac{SS_{res}}{SS_{tot}}, \qquad \text{RMSE} = \sqrt{\frac{SS_{res}}{n}}$$
-
-where SS_res is the sum of squared residuals and SS_tot the sum of squared deviations from the mean. R² close to 1 means the model explains the stroke; RMSE is in drawing units. For non-linear models this is a pseudo-R², so treat it as a rough guide.
-
-### 10. Output
-
-Every piece is rendered as LaTeX with KaTeX in the sidebar. The polynomial formatter orders terms high power first and drops insignificant leading terms, and a dedicated formatter builds the Desmos-pasteable parametric tuple `(X(t), Y(t))` for closed curves. Non-finite coefficients are filtered before any string is built.
-
-## Project structure
-
-```
-MATH-Function-Regression-Algorithm/
-├── index.html            # app shell (CDN: Tailwind, KaTeX; nothing else)
-├── styles.css            # small additions on top of Tailwind
-├── package.json          # npm start / build / test; zero dependencies
-├── scripts/serve.mjs     # zero-dep static server for local dev
-├── scripts/build.mjs     # zero-dep bundler -> dist/topographic-core.html
-├── dist/                 # pre-packaged single-file build, double-clickable
-├── .github/
-│   └── workflows/pages.yml  # GitHub Actions: build + publish Pages
-├── src/
-│   ├── main.js           # bootstrap: store, pointer/wheel, worker orchestration
-│   ├── worker.js         # Web Worker entry (same pipeline as main thread)
-│   ├── analysis.js       # shared pipeline: closure detect, fit, integrate, metrics
-│   ├── renderer.js       # canvas: grid, axes, strokes, fits, integral drawing
-│   ├── ui.js             # vanilla-DOM sidebar and live updates
-│   ├── state.js          # tiny observable store
-│   └── math/             # pure, testable math core
-│       ├── matrix.js     # Gaussian elimination, QR least squares, polynomial fit
-│       ├── regression.js # per-piece fits, arc-length DFT, R²/RMSE
-│       ├── evaluate.js   # model evaluation and exact antiderivatives
-│       ├── integrate.js  # Riemann, Simpson, Lebesgue, exact
-│       └── format.js     # LaTeX and Desmos formatting
-└── test/math.test.js     # 31 unit tests (node --test)
-```
-
-## Stuff for nerds
-
-### How the zero-dependency build works
-
-`scripts/build.mjs` is the whole toolchain. It reads every module in `src/`, walks the import graph in post-order, wraps each module in an IIFE, rewrites `import { x } from './y.js'` into destructuring from an earlier-defined module variable, and returns the exported names as a namespace object. The web worker is compiled the same way and inlined into the page as a Blob source string, so the single-file build has no `import.meta` and no external script tags except the Tailwind and KaTeX CDNs. A `vm.Script` parse check in the build fails fast if any `import` or `import.meta` survives.
-
-### Regression details
-
-- Polynomial fits use a column-scaled Vandermonde matrix and a modified Gram-Schmidt QR solve. The normal equations route is avoided because it squares the condition number. Degrees are capped at 30, and rank-deficient columns are skipped instead of producing NaN.
-- The 1D Fourier fit resamples the stroke to 16,000 uniform x samples, then estimates coefficients with quadrature. Per-sample lookup is a binary search over the sorted stroke, so the resample is O(m log n) rather than O(m n).
-- Closed curves are treated as a complex signal and resampled by cumulative arc length to 16,000 points, which prevents dense handwriting from dominating the spectrum. The DFT returns 2H+1 coefficients for k in [-H, H], and the Lanczos sigma factor is sinc(k pi / (H+1)) because the naive sinc(k pi / H) is zero at k = H.
-- Exponential and logarithmic fits linearise first: ln y vs x, and y vs ln x. The intercept is exponentiated to recover `a`. This assumes multiplicative noise on y.
-
-### Integration details
-
-- Riemann methods and Simpson use `evaluatePiecewise` on the fitted model, not the raw strokes. Simpson enforces an even slice count and is exact for polynomials up to degree 3.
-- The Lebesgue-style integrator samples the function at 5,000 points, sorts them, and accumulates the measure of the level sets {x : f(x) >= t} and {x : f(x) <= t} with binary-search counting per level. Default resolution is 50 levels. A flat function short-circuits to c times the domain width.
-- Exact integrals come from closed-form antiderivatives for every model. The exponential case handles b = 0 as a constant. If any piece antiderivative is non-finite, the engine reports `exact: false` and the UI falls back to the numeric value.
-
-### Numerical notes
-
-- R² is computed at the original stroke points and is a pseudo-R² for non-linear models, so treat values close to 1 as a guide rather than gospel.
-- Overlapping piece domains resolve first-piece-wins in `evaluatePiecewise`; strokes with five or fewer points are ignored.
-- Closure detection in auto mode compares the endpoint distance in screen pixels (math distance times zoom) against a 40 pixel threshold.
-- The worker and the main thread import the same `analysis.js` pipeline, so both paths produce identical floats. Worker failure falls back to the main thread.
-
-### Repo facts
-
-- Runtime: plain browser. Node.js 18+ is only needed for `npm start`, `npm test`, and `npm run build`.
-- The math core in `src/math/` has no imports from the DOM or the UI, so it runs in Node, in the worker, and in the page unchanged.
-- The test suite is 31 tests with no dependencies and no DOM; it covers matrix solvers, every regression model, DFT reconstruction, closure detection, all five integration methods, exact antiderivatives, and formatting edge cases.
-- The single-file bundle is about 331 KB.
-
-## Notable fixes versus the original
-
-- **Lebesgue integration returned 0 for flat functions** and under-counted functions that never cross zero. Now it integrates against the true baseline; regression-tested.
-- **The Lanczos window killed the top harmonic**, since `sinc(k/H)` is zero at k = H. Now `sinc(k/(H+1))`; regression-tested.
-- **High-degree polynomial fits went through numerically unstable normal equations.** Now scaled QR least squares.
-- **Fourier resampling was O(n·m).** Binary search makes each sample lookup O(log n).
-- **A dead worker left "COMPUTING..." stuck forever.** Error paths now fall back to the main thread and reset the UI.
-- **`alert()` and clipboard calls threw on `file://`.** Toasts and a graceful copy fallback replaced them.
-- **The canvas was blurry on HiDPI displays.** Rendering is now device-pixel-ratio aware.
-- **Zoom was anchored to the viewport centre.** It now zooms toward the cursor.
-- **The worker and the UI duplicated the math.** One shared pipeline guarantees identical results.
-- **Mojibake and dead code cleaned up**; the in-browser React/Babel runtime is gone.
-
-## Testing
+## Tests
 
 ```bash
 npm test
 ```
 
-The 31 tests cover the matrix solvers, every regression model, DFT reconstruction, closure detection, all five integration methods (including both Lebesgue regressions), exact antiderivatives, and formatting edge cases. No dependencies, no DOM.
+This needs Node 18 or newer and no packages. The 28 tests check the QR
+solver, every model, a degree-30 fit, the FFT, the closed-curve area, every
+integration method against exact values, the formula output, and a run over
+broken input (NaN points, vertical lines, single dots, huge values).
 
-## License
+## Files
 
-[MIT](./LICENSE)
+```
+index.html          page layout and Content-Security-Policy
+src/math.js         fitting, FFT and integration (no DOM; also used by the tests)
+src/app.js          drawing, canvas and results panel
+src/splash.js       startup animation
+src/styles.css      styles
+assets/             logo, greeting font, dropdown arrow
+tests/              unit tests
+.github/workflows/  tests and GitHub Pages deploy
+```
+
+## Privacy
+
+The page does not make network requests. Settings are saved in the
+browser's `localStorage`. See [SECURITY.md](SECURITY.md).
+
+## Licence
+
+MIT. See [LICENSE](LICENSE) and [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
 ## Disclaimer
 
