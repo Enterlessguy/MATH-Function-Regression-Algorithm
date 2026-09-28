@@ -16,12 +16,12 @@
 
     const STORAGE_KEY = 'idb.function-regression.v1';
     const DEFAULTS = {
-        drawingMode: 'single', topology: 'auto', model: 'polynomial', degree: 3, harmonics: 12,
+        drawingMode: 'single', shape: 'auto', model: 'polynomial', degree: 3, harmonics: 12,
         sigma: false, intMethod: 'simpson', intN: 50, showArea: true, showRaw: true, intro: true, userName: '',
     };
     const ENUMS = {
         drawingMode: ['single', 'piecewise'],
-        topology: ['auto', 'open', 'closed'],
+        shape: ['auto', 'open', 'closed'],
         model: ['polynomial', 'fourier', 'exponential', 'logarithmic', 'constant'],
         intMethod: ['simpson', 'trapezoid', 'mid', 'left', 'right', 'lebesgue'],
     };
@@ -32,7 +32,7 @@
     // Strip control characters and cap the length; the name is only ever drawn on a canvas.
     const cleanName = s => String(s).replace(/[\u0000-\u001f\u007f-\u009f]/g, '').trim().slice(0, 40);
 
-    /** Untrusted storage in, known-good settings out. */
+    /** Validate settings read from localStorage: allow-listed choices, clamped numbers, cleaned name. */
     function sanitize(raw) {
         const s = { ...DEFAULTS };
         if (!raw || typeof raw !== 'object') return s;
@@ -89,7 +89,7 @@
                 const btn = e.target.closest('button[data-value]');
                 if (!btn || !ENUMS[key].includes(btn.dataset.value)) return;
                 settings[key] = btn.dataset.value;
-                if (key === 'drawingMode' && settings.drawingMode === 'piecewise') settings.topology = 'open';
+                if (key === 'drawingMode' && settings.drawingMode === 'piecewise') settings.shape = 'open';
                 changed(key);
             });
         });
@@ -158,7 +158,7 @@
     /** Whether the current strokes are (or will be) treated as a closed curve. */
     function isClosedMode() {
         if (analysis) return analysis.type === 'closed';
-        return settings.drawingMode === 'single' && settings.topology === 'closed';
+        return settings.drawingMode === 'single' && settings.shape === 'closed';
     }
 
     // ============================================================ canvas sizing and view
@@ -615,7 +615,7 @@
             sub.textContent = 'Waiting for a stroke';
             setBadge('Idle');
             const ph = el('div', 'placeholder');
-            ph.append(el('strong', '', 'No data yet'), el('span', '', 'Fitted formulas, fit quality and the area appear here.'));
+            ph.append(el('strong', '', 'No data yet'), el('span', '', 'Draw a stroke to see its formula, R², RMSE and area.'));
             root.append(ph);
             return;
         }
@@ -660,7 +660,7 @@
             if (formula.note) notes.push(formula.note);
             if (p.fit.model === 'polynomial' && p.fit.degree < p.fit.requestedDegree) notes.push(`degree limited to ${p.fit.degree} by the number of distinct points`);
             if (p.fit.model === 'fourier' && p.fit.harmonics < p.fit.requestedHarmonics) notes.push(`limited to ${p.fit.harmonics} harmonics by the number of points (Nyquist)`);
-            if (p.fit.model === 'fourier') notes.push('chord between the end values removed before the transform, so the ends have no Gibbs overshoot');
+            if (p.fit.model === 'fourier') notes.push('the line through the two end points is subtracted before the transform and added back after, so the series matches the stroke at both ends');
             notes.forEach(n => card.append(formulaNode(n, 'formula-note')));
 
             const stats = el('div', 'stats');
@@ -677,8 +677,8 @@
             const all = good.map(p => `y=${M.formatFit(p.fit).tex}${domainTex(p)}`).join('\n');
             const card = el('div', 'card');
             const head = el('div', 'card-head');
-            head.append(el('div', 'card-title', 'Whole system'), copyButton('Copy all', all));
-            card.append(head, el('div', 'card-meta', 'One line per segment, ready to paste into Desmos.'));
+            head.append(el('div', 'card-title', 'All segments'), copyButton('Copy all', all));
+            card.append(head, el('div', 'card-meta', 'One line per segment, in Desmos format.'));
             root.append(card);
         }
     }
@@ -717,14 +717,14 @@
         const kv = el('dl', 'kv');
         const row = (k, v) => kv.append(el('dt', '', k), el('dd', '', v));
         row('From coefficients  π Σ k|cₖ|²', fmt(Math.abs(fit.fittedArea), 8));
-        row('Raw stroke (shoelace)', fmt(Math.abs(fit.rawArea), 8));
+        row('Shoelace formula on the raw stroke', fmt(Math.abs(fit.rawArea), 8));
         row('Perimeter', fmt(fit.perimeter, 6));
         area.append(head, big, kv);
         root.append(area);
 
         const card = el('div', 'card');
         const h2 = el('div', 'card-head');
-        h2.append(el('div', 'card-title', 'Parametric reconstruction'), copyButton('Copy for Desmos', M.formatParametric(fit.coeffs)));
+        h2.append(el('div', 'card-title', 'Parametric curve'), copyButton('Copy for Desmos', M.formatParametric(fit.coeffs)));
         card.append(h2);
         card.append(formulaNode('<i>z</i>(<i>t</i>) = Σ<sub>|<i>k</i>|≤' + fit.harmonics + '</sub> <i>c<sub>k</sub></i> <i>e</i><sup>2π<i>ikt</i></sup>, &nbsp;<i>t</i> ∈ [0, 1]'));
         card.append(formulaNode('<i>X</i>(<i>t</i>) = Re <i>z</i>(<i>t</i>), &nbsp;<i>Y</i>(<i>t</i>) = Im <i>z</i>(<i>t</i>)', 'formula-note'));
@@ -765,7 +765,7 @@
         const btn = e.target.closest('button[data-copy]');
         if (!btn) return;
         const ok = await copyText(btn.dataset.copy);
-        toast(ok ? 'Copied. Paste it into Desmos or any LaTeX editor.' : 'Copy failed. Your browser blocked clipboard access.');
+        toast(ok ? 'Copied to clipboard.' : 'Copy failed: the browser blocked clipboard access.');
     }
 
     async function copyText(text) {

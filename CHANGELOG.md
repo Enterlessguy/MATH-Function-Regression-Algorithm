@@ -1,68 +1,61 @@
 # Changelog
 
-All notable changes to Function Regression Algorithm (formerly Topographic Core) are documented here. The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+Changes to the Function Regression Algorithm. The format follows
+[Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and versions follow
+[Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [3.0.0] - 2026-09-28
 
-Intelligence Database redesign, with a new numerical core and zero third-party code.
-
-### Design
-- New Intelligence Database look, matching I-DB Macro and the Schedule I
-  Control Center. It uses their design tokens, sidebar, cards, segmented
-  controls and toggles.
-- Adds the shared startup animation: a 720 ms fade-in, a hold of at least
-  900 ms and a 680 ms fade-out. <kbd>Esc</kbd>, <kbd>Space</kbd> or
-  <kbd>Enter</kbd> skips it, and it is skipped automatically when the system
-  asks for reduced motion.
-- Canvas rendering is sharp on high-DPI screens, zooms around the cursor and
-  redraws only when something changes.
-- Adds undo, fit-to-strokes, PNG export and toasts in place of `alert()`.
-
-### Maths
-- Least squares uses Householder QR on a Chebyshev basis over x mapped to
-  [-1, 1]. v2 used column-scaled modified Gram–Schmidt on raw powers of x.
-  Degree 30 now stays accurate to about 1e-6, even far from the origin.
-- The polynomial degree is capped by the number of distinct points.
-- Points are weighted by x-spacing, so slow pen movement no longer biases the
-  fit.
-- Exponential fit: log-linear start followed by Levenberg–Marquardt on the
-  true residuals. v2 stopped at the log-linear fit, which is biased by noise.
-  Negative amplitudes now work.
-- 1-D Fourier: the chord is removed before the transform, which ends the
-  Gibbs overshoot at both ends, and the coefficients come from an FFT instead
-  of 16,000-sample quadrature. Harmonics are capped at Nyquist.
-- Closed shapes: FFT-based. Adds the coefficient area π Σ k|cₖ|², the RMS
-  deviation and the orientation.
-- Lanczos σ is now off by default. Both series are continuous, so it only
-  shrank shapes (about 2% of the area at 12 harmonics).
-- Lebesgue sum: midpoint levels with dense sorted samples. Unbiased for
-  constants and for positive and negative parts.
+### Changed
+- New look, matching I-DB Macro and the Schedule I Control Center.
+- Startup animation shared with those two apps: 720 ms fade-in, at least
+  900 ms hold, 680 ms fade-out. <kbd>Esc</kbd>, <kbd>Space</kbd> or
+  <kbd>Enter</kbd> skips it. It is not shown when the system asks for reduced
+  motion.
+- Polynomials are fitted in a Chebyshev basis with Householder QR (v2 used
+  Gram–Schmidt on powers of x). A degree-30 fit on x in [20, 30] is now
+  accurate to 1e-6.
+- Points are weighted by the x-spacing around them, so parts of the stroke
+  drawn slowly no longer count for more.
+- Exponential fits are refined with Levenberg–Marquardt after the log-linear
+  starting guess. v2 used the log-linear fit only, which is biased when the
+  data is noisy. Negative amplitudes work.
+- Fourier series of a function: the line through the two end points is
+  subtracted before the transform. This removes the Gibbs overshoot at both
+  ends. The coefficients come from an FFT, not from 16,000-sample sums.
+  Harmonics are limited to half the number of points.
+- Closed curves use an FFT and also report the area π Σ k|cₖ|², the RMS
+  distance from the stroke and the direction of travel.
+- Lanczos σ is off by default. It shrank closed curves by about 2% of their
+  area at 12 harmonics.
 - Every integral is compared with a Gauss–Legendre reference. The error is
-  shown relative to ∫|f|, so a signed area near zero no longer reports huge
-  relative errors.
-- Auto-closure is scale-aware: the endpoint gap is compared with the shape's
-  size, not a fixed 40 px.
+  shown relative to ∫|f|, because relative to the signed area it becomes
+  meaningless when the signed area is near zero.
+- Auto-detection of closed curves compares the gap between the end points
+  with the size of the shape, not with a fixed 40 px.
+
+### Added
+- Undo, fit view to drawing, PNG export.
 
 ### Security
-- Removed the last CDN dependencies, the Tailwind Play CDN and KaTeX. Neither had
-  Subresource Integrity, and Tailwind's runtime compiler injects styles, which
-  rules out a strict CSP. The app now makes no network requests at all.
-- Removed `scripts/serve.mjs`, which listened on every network interface and
-  served any file in the checkout, including `.git/`. It's no longer needed,
-  because the page runs from `file://`.
-- Adds a strict Content-Security-Policy and validates stored settings.
-- The Pages workflow publishes only `index.html`, `src/` and `assets/`, not the
-  whole repository, and runs the tests first.
+- Tailwind and KaTeX are no longer loaded from CDNs. They had no integrity
+  hashes, and the Tailwind CDN version was not pinned. The page now makes no
+  network requests, and a Content-Security-Policy blocks any it didn't ship
+  with.
+- Settings read from `localStorage` are validated.
+- Removed `scripts/serve.mjs`. It listened on all network interfaces and
+  served every file in the folder, including `.git/`.
+- The Pages workflow runs the tests and publishes only `index.html`, `src/`
+  and `assets/`.
 
 ### Removed
-- The build script and `dist/` single-file bundle. The page itself now runs
-  from `file://`, because it uses classic scripts, not ES modules.
-- The Web Worker. With FFTs in place of 16,000-sample quadrature, a full
-  analysis takes 1–5 ms on the main thread. The worst case, 500 harmonics
-  plus a 1000-level Lebesgue sum, takes about 70 ms.
-- Exact antiderivative integration. It is replaced by a composite
-  Gauss–Legendre reference, which agrees with the antiderivatives to about
-  1e-12 (see the tests) and also covers gaps between segments.
+- The build script and the `dist/` bundle. The page opens directly from disk
+  because it no longer uses ES modules.
+- The Web Worker. With FFTs, a full analysis takes 1–5 ms. The slowest case,
+  500 harmonics with a 1000-level Lebesgue sum, takes about 70 ms.
+- Exact integrals from antiderivatives. The Gauss–Legendre reference matches
+  them to about 1e-12 (checked in the tests) and also handles gaps between
+  segments.
 
 ## [2.0.0] - 2026-08-08
 
@@ -86,7 +79,7 @@ Intelligence Database redesign, with a new numerical core and zero third-party c
 ### Changed
 - React plus in-browser Babel replaced with plain ES modules and a zero-build setup.
 - Worker and main thread now share one analysis pipeline.
-- The app ships as a single self-contained `dist/topographic-core.html`.
+- The app ships as a single self-contained HTML file in `dist/`.
 
 ### Removed
 - In-browser runtime transpilation (about 400 KB of script).

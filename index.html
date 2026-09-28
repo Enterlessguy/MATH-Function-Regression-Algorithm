@@ -15,7 +15,7 @@
 <body class="booting">
     <div class="app" id="app">
         <!-- ============================================================ Sidebar -->
-        <aside class="sidebar" aria-label="Engine settings">
+        <aside class="sidebar" aria-label="Settings">
             <div class="brand">
                 <img src="assets/cube.png" alt="" width="38" height="38">
                 <div>
@@ -33,8 +33,8 @@
                         <button type="button" data-value="piecewise">Piecewise</button>
                     </div>
                     <div class="row-when" data-show="single">
-                        <label class="field-label">Topology</label>
-                        <div class="segmented" data-setting="topology">
+                        <label class="field-label">Shape</label>
+                        <div class="segmented" data-setting="shape">
                             <button type="button" data-value="auto">Auto</button>
                             <button type="button" data-value="open">Function</button>
                             <button type="button" data-value="closed">Closed</button>
@@ -44,7 +44,7 @@
 
                 <section class="group" id="model-group">
                     <h2 class="section">Model</h2>
-                    <label class="field-label" for="model">Regression target</label>
+                    <label class="field-label" for="model">Function type</label>
                     <select id="model" data-setting="model">
                         <option value="polynomial">Polynomial</option>
                         <option value="fourier">Fourier series</option>
@@ -59,7 +59,7 @@
                     <div class="slider" data-show="harmonics">
                         <div class="slider-head"><label for="harmonics">Harmonics</label><output data-for="harmonics"></output></div>
                         <input type="range" id="harmonics" data-setting="harmonics" min="1" max="500" step="1">
-                        <label class="toggle" title="Damps high harmonics. Rarely needed: the series here are already continuous, so there is no Gibbs overshoot to suppress. Slightly shrinks shapes."><input type="checkbox" data-setting="sigma"><span></span>Lanczos σ smoothing</label>
+                        <label class="toggle" title="Multiplies harmonic k by sinc(k/(m+1)). Reduces ringing, but also shrinks the curve slightly. Off by default."><input type="checkbox" data-setting="sigma"><span></span>Lanczos σ smoothing</label>
                     </div>
                 </section>
 

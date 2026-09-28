@@ -209,7 +209,7 @@ test('auto closure detection works in screen pixels', () => {
 });
 
 test('analyzeStrokes: piecewise strokes give one piece each with metrics', () => {
-    const settings = { drawingMode: 'piecewise', topology: 'open', model: 'polynomial', degree: 2, harmonics: 5, sigma: false, intMethod: 'simpson', intN: 50 };
+    const settings = { drawingMode: 'piecewise', shape: 'open', model: 'polynomial', degree: 2, harmonics: 5, sigma: false, intMethod: 'simpson', intN: 50 };
     const res = M.analyzeStrokes([sample(x => x, -3, -1, 30), sample(x => x * x, 0, 2, 30)], settings, 40);
     assert.equal(res.type, 'function');
     assert.equal(res.pieces.length, 2);
@@ -218,7 +218,7 @@ test('analyzeStrokes: piecewise strokes give one piece each with metrics', () =>
 });
 
 test('analyzeStrokes returns null for strokes that are too short', () => {
-    const settings = { drawingMode: 'single', topology: 'auto', model: 'polynomial', degree: 3, harmonics: 5, sigma: false, intMethod: 'mid', intN: 50 };
+    const settings = { drawingMode: 'single', shape: 'auto', model: 'polynomial', degree: 3, harmonics: 5, sigma: false, intMethod: 'mid', intN: 50 };
     assert.equal(M.analyzeStrokes([[{ x: 0, y: 0 }, { x: 1, y: 1 }]], settings, 40), null);
     assert.equal(M.analyzeStrokes([], settings, 40), null);
 });
@@ -232,16 +232,16 @@ test('analyzeStrokes never throws on pathological input', () => {
         Array.from({ length: 50 }, (_, i) => ({ x: i, y: 1e300 * (i % 2 ? 1 : -1) })),            // huge values
     ];
     for (const model of ['polynomial', 'fourier', 'exponential', 'logarithmic', 'constant']) {
-        for (const topology of ['auto', 'open', 'closed']) {
+        for (const shape of ['auto', 'open', 'closed']) {
             for (const intMethod of ['lebesgue', 'simpson', 'left']) {
                 for (const mode of ['single', 'piecewise']) {
-                    const settings = { drawingMode: mode, topology, model, degree: 30, harmonics: 500, sigma: true, intMethod, intN: 1000 };
+                    const settings = { drawingMode: mode, shape, model, degree: 30, harmonics: 500, sigma: true, intMethod, intN: 1000 };
                     for (const s of nasty) {
                         assert.doesNotThrow(() => {
                             const res = M.analyzeStrokes([s], settings, 40);
                             if (res && res.type === 'function') res.pieces.forEach(p => p.fit && M.formatFit(p.fit));
                             if (res && res.type === 'closed') M.formatParametric(res.fit.coeffs);
-                        }, `${model}/${topology}/${intMethod}/${mode}`);
+                        }, `${model}/${shape}/${intMethod}/${mode}`);
                     }
                 }
             }

@@ -1,5 +1,5 @@
 /*
- * Function Regression - numerical core.
+ * Function Regression - fitting, Fourier transforms and integration.
  *
  * Pure functions only: no DOM, no globals besides the export. Loaded as a
  * classic script in the browser (window.FRMath) and as a CommonJS module by
@@ -816,18 +816,18 @@
     }
 
     /**
-     * Whole analysis for a set of strokes. Never throws: failures come back as
+     * Fit and integrate a set of strokes. Never throws: failures come back as
      * {type: 'error'} or as pieces with an `error` field.
      *
-     * settings: {drawingMode, topology, model, degree, harmonics, sigma, intMethod, intN}
+     * settings: {drawingMode, shape, model, degree, harmonics, sigma, intMethod, intN}
      */
     function analyzeStrokes(strokes, settings, scale) {
         try {
             const valid = (strokes || []).map(finitePoints).filter(s => s.length >= 4);
             if (!valid.length) return null;
             const single = settings.drawingMode === 'single';
-            const closed = single && (settings.topology === 'closed' ||
-                (settings.topology === 'auto' && isClosedStroke(valid[0], scale)));
+            const closed = single && (settings.shape === 'closed' ||
+                (settings.shape === 'auto' && isClosedStroke(valid[0], scale)));
 
             if (closed) {
                 const fit = fitClosed(valid[0], settings.harmonics, settings.sigma);
